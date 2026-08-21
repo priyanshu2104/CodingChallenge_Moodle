@@ -67,12 +67,20 @@ final class Connection
 
     private static function requireEnv(string $key): string
     {
+        // phpdotenv createImmutable() populates $_ENV / $_SERVER but not getenv(),
+        // so we check all three sources in priority order.
+        // Note: DB_PASS may intentionally be an empty string (passwordless local auth).
+        if (array_key_exists($key, $_ENV)) {
+            return (string) $_ENV[$key];
+        }
+        if (array_key_exists($key, $_SERVER)) {
+            return (string) $_SERVER[$key];
+        }
         $value = getenv($key);
-
-        if ($value === false || $value === '') {
-            throw new RuntimeException("Missing required environment variable: {$key}");
+        if ($value !== false) {
+            return $value;
         }
 
-        return $value;
+        throw new RuntimeException("Missing required environment variable: {$key}");
     }
 }
