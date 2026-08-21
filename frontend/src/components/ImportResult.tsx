@@ -28,21 +28,17 @@ export default function ImportResult({ result, onReset }: Props) {
         </div>
         <div className="result-stat">
           <div className="result-stat-value skipped">{result.skipped}</div>
-          <div className="result-stat-label">Skipped</div>
-        </div>
-        <div className="result-stat">
-          <div className="result-stat-value errors">{result.errors.length}</div>
-          <div className="result-stat-label">DB Errors</div>
+          <div className="result-stat-label">Already in DB</div>
         </div>
       </div>
 
       {result.errors.length > 0 && (
         <div className="db-errors">
-          <h4>⚠ Database-level skips (email already exists)</h4>
+          <h4>ℹ️ These emails already existed in the database and were skipped</h4>
           <ul>
             {result.errors.map((e, i) => (
               <li key={i}>
-                Line {e.line} — <code>{e.email}</code>: {e.reason}
+                Line {e.line} — <code>{e.email}</code>
               </li>
             ))}
           </ul>
