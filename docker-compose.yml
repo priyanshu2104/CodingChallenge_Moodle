@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: moodle_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-moodle_users}
+      POSTGRES_USER:     ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-secret}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  php:
+    image: php:8.3-cli
+    container_name: moodle_php
+    working_dir: /app/backend
+    volumes:
+      - .:/app
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-moodle_users}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-secret}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "
+        apt-get update -qq &&
+        apt-get install -y --no-install-recommends libpq-dev zip unzip curl git &&
+        docker-php-ext-install pdo pdo_pgsql &&
+        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer &&
+        composer install --no-interaction --prefer-dist &&
+        php -S 0.0.0.0:8080 -t public
+      "
+
+volumes:
+  postgres_data:
