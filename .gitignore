@@ -1,0 +1,25 @@
+# Dependencies
+backend/vendor/
+frontend/node_modules/
+
+# Environment
+backend/.env
+.env
+
+# Build artifacts
+frontend/dist/
+
+# Composer lock (keep for reproducibility, but ignore local caches)
+backend/.composer/
+
+# PHP
+*.log
+*.cache
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
