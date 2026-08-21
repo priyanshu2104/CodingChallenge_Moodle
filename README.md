@@ -212,8 +212,53 @@ composer test        # or: php vendor/bin/phpunit --testdox
 
 Expected output:
 ```
-PHPUnit 11.x — 22 tests, 42 assertions — OK
+OK (28 tests, 64 assertions)
 ```
+
+### Test coverage
+
+| Suite | Tests | What's covered |
+|---|---|---|
+| `CsvParserTest` | 10 | Valid CSV, Windows line endings, BOM stripping, whitespace trimming, empty rows, case-insensitive header, missing columns, file not found |
+| `UserValidatorTest` | 12 | Name/surname capitalisation, email lowercasing, hyphenated names, valid/invalid status, missing fields, batch deduplication, case-insensitive dedup, malformed emails |
+| `UserImporterTest` | 6 | Successful insert, invalid rows skipped (no DB call), unique-violation reported as skip, mixed rows, empty input, non-unique DB errors re-thrown |
+
+---
+
+## Validation Rules
+
+| Field | Rule | Behaviour on failure |
+|---|---|---|
+| `name` | Must be non-empty | Row rejected — `"name is required"` |
+| `surname` | Must be non-empty | Row rejected — `"surname is required"` |
+| `email` | Must be non-empty | Row rejected — `"email is required"` |
+| `email` | Must pass `filter_var(FILTER_VALIDATE_EMAIL)` | Row rejected — `"invalid email address: \"…\""` |
+| `email` | Must be unique within the CSV batch | Second occurrence rejected — `"duplicate email: \"…\" (first seen on line N)"` |
+| `email` | Must be unique in the database | Graceful skip at import time — reported in summary |
+
+**Normalisation applied before validation:**
+- `name` → `ucfirst(strtolower($name))` — handles hyphenated names (e.g. `anne-marie` → `Anne-Marie`)
+- `surname` → same rule
+- `email` → `strtolower($email)`
+
+---
+
+## Error Handling
+
+The application handles the following error conditions gracefully:
+
+| Condition | CLI behaviour | API behaviour |
+|---|---|---|
+| CSV file not found | Prints error to stderr, exits 1 | HTTP 422 with JSON error |
+| CSV file unreadable | Prints error to stderr, exits 1 | HTTP 422 with JSON error |
+| Empty CSV / missing header | Prints error to stderr, exits 1 | HTTP 422 with JSON error |
+| Missing required CSV column | Prints error to stderr, exits 1 | HTTP 422 with JSON error |
+| Invalid email address | Row marked invalid in preview, not imported | Row marked invalid in preview, not imported |
+| Duplicate email (in batch) | Row marked invalid in preview, not imported | Row marked invalid in preview, not imported |
+| Duplicate email (in DB) | Reported as skip in import summary | Reported as skip in import summary |
+| Database connection failure | Prints error to stderr, exits 1 | HTTP 500 with JSON error |
+| Unknown CLI argument | Usage hint printed, exits 1 | — |
+| No `--file` argument | Usage hint printed, exits 1 | — |
 
 ---
 

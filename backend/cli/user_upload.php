@@ -32,11 +32,21 @@ $dotenv->safeLoad(); // won't throw if .env doesn't exist (env vars may be set e
 
 // ─── Parse CLI arguments ─────────────────────────────────────────────────────
 
-$opts = getopt('', ['file:', 'dry-run', 'create-table', 'help']);
+$opts = getopt('', ['file:', 'dry-run', 'create-table', 'help'], $restIndex);
 
 if (isset($opts['help']) || $opts === false) {
     printHelp();
     exit(0);
+}
+
+// Detect unknown flags (getopt silently ignores them; we should not)
+$knownFlags = ['--file', '--dry-run', '--create-table', '--help'];
+foreach (array_slice($argv, 1) as $arg) {
+    if (str_starts_with($arg, '--') && !in_array(strtok($arg, '='), $knownFlags, true)) {
+        err("Unknown option: {$arg}");
+        err('Run with --help to see available options.');
+        exit(1);
+    }
 }
 
 // ─── --create-table ───────────────────────────────────────────────────────────
