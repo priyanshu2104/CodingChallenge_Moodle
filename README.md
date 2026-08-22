@@ -12,7 +12,7 @@ The import flow is:
 Upload → Parse → Validate → Preview → Import
 ```
 
-The same core PHP services (`CsvParser`, `UserValidator`, `UserImporter`) are shared between the CLI and the HTTP API, so validation behaviour is identical in both interfaces.
+The same core PHP services (`CsvParser`, `UserValidator`, `UserImporter`) are shared between the CLI and the HTTP API, ensuring consistent parsing, validation, and import behaviour across both interfaces.
 
 ---
 
@@ -51,7 +51,8 @@ The same core PHP services (`CsvParser`, `UserValidator`, `UserImporter`) are sh
 │   │       └── ValidatedUser.php # DTO
 │   ├── tests/
 │   │   ├── CsvParserTest.php
-│   │   └── UserValidatorTest.php
+│   │   ├── UserValidatorTest.php
+│   │   └── UserImporterTest.php
 │   ├── .env.example
 │   ├── composer.json
 │   └── phpunit.xml
@@ -102,6 +103,8 @@ docker compose exec php php cli/user_upload.php --create-table
 # 4. Start the React dev server (in a separate terminal)
 cd frontend && npm install && npm run dev
 ```
+
+> **Note:** Docker Compose starts the PostgreSQL database and PHP API service. The React frontend is intentionally run separately with Vite so that hot-reloading works during development.
 
 Open **http://localhost:5173** in your browser.
 
@@ -190,6 +193,9 @@ php backend/cli/user_upload.php --file users.csv
 
 # Create table AND import in one step
 php backend/cli/user_upload.php --file users.csv --create-table
+
+# Strict mode — reject unexpected columns or row shape mismatches
+php backend/cli/user_upload.php --file users.csv --strict --dry-run
 ```
 
 ### CLI Options
