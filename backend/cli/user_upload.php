@@ -159,14 +159,23 @@ try {
     exit(1);
 }
 
-out(sprintf(
-    "\nImport complete:\n  Inserted: %d\n  Skipped (already in DB): %d",
-    $summary['inserted'],
-    $summary['skipped']
-));
+$inBatch    = count($invalid);
+$inDb       = $summary['skipped'];
+$totalSkipped = $inBatch + $inDb;
+
+out('');
+out('Import Summary');
+out(str_repeat('─', 40));
+out(sprintf('  Total records:    %4d', count($validated)));
+out(sprintf('  Valid records:    %4d', count($valid)));
+out(sprintf('  Invalid records:  %4d', $inBatch));
+out(sprintf('  Inserted:         %4d', $summary['inserted']));
+out(sprintf('  Already in DB:    %4d', $inDb));
+out(sprintf('  Total skipped:    %4d', $totalSkipped));
+out(str_repeat('─', 40));
 
 if ($summary['errors'] !== []) {
-    out("\nDatabase-level skips:");
+    out("\nDatabase-level skips (email already existed):");
     foreach ($summary['errors'] as $e) {
         out(sprintf('  Line %d — %s: %s', $e['line'], $e['email'], $e['reason']));
     }
