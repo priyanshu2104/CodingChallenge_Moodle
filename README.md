@@ -160,7 +160,7 @@ All connection details are read from environment variables (never hard-coded):
 | `DB_PORT` | `5432`         | PostgreSQL port       |
 | `DB_NAME` | `moodle_users` | Database name         |
 | `DB_USER` | `postgres`     | Database user         |
-| `DB_PASS` | `secret`       | Database password     |
+| `DB_PASS` | `<your-password>` | PostgreSQL password   |
 
 Copy `backend/.env.example` to `backend/.env` and edit as needed.
 
