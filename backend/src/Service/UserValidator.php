@@ -36,6 +36,12 @@ final class UserValidator
             $surname = $row['surname'] ?? '';
             $email   = $row['email']   ?? '';
 
+            // Strict-mode schema errors from CsvParser (e.g. column-count mismatch)
+            if (isset($row['_strict_error'])) {
+                $validated[] = new ValidatedUser('', '', '', 'invalid', [$row['_strict_error']], $line);
+                continue;
+            }
+
             // Normalise
             $name    = $this->capitaliseName($name);
             $surname = $this->capitaliseName($surname);

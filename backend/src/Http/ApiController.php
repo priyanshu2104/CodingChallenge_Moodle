@@ -84,7 +84,8 @@ final class ApiController
             return;
         }
 
-        $parser    = new CsvParser();
+        $strict    = !empty($_POST['strict']);
+        $parser    = new CsvParser($strict);
         $validator = new UserValidator();
 
         try {

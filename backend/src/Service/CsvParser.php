@@ -20,11 +20,18 @@ use RuntimeException;
  *  - Whitespace trimming of every cell value
  *  - Missing or incomplete header rows
  *  - Completely empty rows (skipped silently)
+ *  - Strict mode: rejects unexpected columns and column-count mismatches
  */
 final class CsvParser
 {
     /** Expected column names in the CSV header (order-independent). */
     private const REQUIRED_COLUMNS = ['name', 'surname', 'email'];
+
+    /**
+     * @param bool $strict When true, unexpected header columns and row column-count
+     *                     mismatches are treated as errors rather than silently ignored.
+     */
+    public function __construct(private readonly bool $strict = false) {}
 
     /**
      * Parses a CSV file by path and returns an array of associative rows.
@@ -104,6 +111,7 @@ final class CsvParser
             $header
         );
 
+        // Validate required columns
         foreach (self::REQUIRED_COLUMNS as $required) {
             if (!in_array($required, $header, true)) {
                 throw new InvalidArgumentException(
@@ -113,6 +121,17 @@ final class CsvParser
             }
         }
 
+        // In strict mode, reject any columns beyond the required set
+        $extraColumns = array_diff($header, self::REQUIRED_COLUMNS);
+        if ($this->strict && $extraColumns !== []) {
+            throw new InvalidArgumentException(
+                'Strict mode: unexpected column(s) in CSV header: '
+                . implode(', ', $extraColumns)
+                . '. Expected only: ' . implode(', ', self::REQUIRED_COLUMNS)
+            );
+        }
+
+        $expectedColumnCount = count($header);
         $rows = [];
         $lineNumber = 1; // 1-based (header is line 1)
 
@@ -121,6 +140,22 @@ final class CsvParser
 
             // Skip entirely empty rows
             if ($rawRow === [null] || array_filter($rawRow, fn($v) => $v !== null && $v !== '') === []) {
+                continue;
+            }
+
+            // In strict mode, reject rows with a different number of columns than the header
+            if ($this->strict && count($rawRow) !== $expectedColumnCount) {
+                $rows[] = [
+                    'name'    => '',
+                    'surname' => '',
+                    'email'   => '',
+                    '_line'   => $lineNumber,
+                    '_strict_error' => sprintf(
+                        'column count mismatch: expected %d, got %d',
+                        $expectedColumnCount,
+                        count($rawRow)
+                    ),
+                ];
                 continue;
             }
 

@@ -126,4 +126,44 @@ final class CsvParserTest extends TestCase
 
         $this->parser->parseFile('/tmp/definitely-does-not-exist.csv');
     }
+
+    // -------------------------------------------------------------------------
+    // Strict mode
+    // -------------------------------------------------------------------------
+
+    public function test_strict_mode_rejects_extra_header_columns(): void
+    {
+        $parser = new CsvParser(strict: true);
+        $csv    = "name,surname,email,extra_column\nJohn,Smith,john@example.com,foo";
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/unexpected column/i');
+
+        $parser->parseString($csv);
+    }
+
+    public function test_strict_mode_marks_row_with_column_count_mismatch(): void
+    {
+        $parser = new CsvParser(strict: true);
+        // Valid header, but data row has an extra field
+        $csv = "name,surname,email\nJohn,Smith,john@example.com,extra";
+
+        $rows = $parser->parseString($csv);
+
+        self::assertCount(1, $rows);
+        self::assertArrayHasKey('_strict_error', $rows[0]);
+        self::assertStringContainsString('column count mismatch', $rows[0]['_strict_error']);
+    }
+
+    public function test_tolerant_mode_ignores_extra_columns(): void
+    {
+        // Default (non-strict) parser silently ignores extra fields.
+        // The parser preserves raw case — normalisation is the validator's job.
+        $csv  = "name,surname,email\nJohn,Smith,john@example.com,extra";
+        $rows = $this->parser->parseString($csv);
+
+        self::assertCount(1, $rows);
+        self::assertSame('John', $rows[0]['name']); // parser preserves case as-is
+        self::assertArrayNotHasKey('_strict_error', $rows[0]);
+    }
 }

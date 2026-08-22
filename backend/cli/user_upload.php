@@ -7,10 +7,11 @@ declare(strict_types=1);
  * user_upload.php — CLI for importing users from a CSV file into PostgreSQL.
  *
  * Usage:
- *   php user_upload.php --file <path>        Import users from <path>
- *   php user_upload.php --file <path> --dry-run   Validate only, no DB writes
- *   php user_upload.php --create-table       Create/rebuild the users table
- *   php user_upload.php --help               Show help
+ *   php user_upload.php --file <path>                Import users from <path>
+ *   php user_upload.php --file <path> --dry-run       Validate only, no DB writes
+ *   php user_upload.php --file <path> --strict        Reject unexpected columns/row shape
+ *   php user_upload.php --create-table               Create/rebuild the users table
+ *   php user_upload.php --help                       Show help
  */
 
 // Locate the backend root (this script lives in backend/cli/)
@@ -32,7 +33,7 @@ $dotenv->safeLoad(); // won't throw if .env doesn't exist (env vars may be set e
 
 // ─── Parse CLI arguments ─────────────────────────────────────────────────────
 
-$opts = getopt('', ['file:', 'dry-run', 'create-table', 'help'], $restIndex);
+$opts = getopt('', ['file:', 'dry-run', 'create-table', 'help', 'strict'], $restIndex);
 
 if (isset($opts['help']) || $opts === false) {
     printHelp();
@@ -40,7 +41,7 @@ if (isset($opts['help']) || $opts === false) {
 }
 
 // Detect unknown flags (getopt silently ignores them; we should not)
-$knownFlags = ['--file', '--dry-run', '--create-table', '--help'];
+$knownFlags = ['--file', '--dry-run', '--create-table', '--help', '--strict'];
 foreach (array_slice($argv, 1) as $arg) {
     if (str_starts_with($arg, '--') && !in_array(strtok($arg, '='), $knownFlags, true)) {
         err("Unknown option: {$arg}");
@@ -76,10 +77,15 @@ if (!isset($opts['file'])) {
 
 $filePath = $opts['file'];
 $dryRun   = isset($opts['dry-run']);
+$strict   = isset($opts['strict']);
 
 // ─── Parse ───────────────────────────────────────────────────────────────────
 
-$parser = new CsvParser();
+$parser = new CsvParser($strict);
+
+if ($strict) {
+    out('[Strict mode] Unexpected columns and row shape mismatches will be rejected.');
+}
 
 try {
     $rows = $parser->parseFile($filePath);
@@ -185,6 +191,7 @@ function printHelp(): void
     Options:
       --file <filename>    CSV file to process (required for import)
       --dry-run            Parse and validate without writing to the database
+      --strict             Reject unexpected CSV columns or column-count mismatches
       --create-table       Create (or rebuild) the users table before importing
       --help               Display this help message
 
@@ -193,6 +200,7 @@ function printHelp(): void
       php cli/user_upload.php --file users.csv --dry-run
       php cli/user_upload.php --file users.csv
       php cli/user_upload.php --file users.csv --create-table
+      php cli/user_upload.php --file users.csv --strict --dry-run
 
     CSV format:
       name,surname,email
