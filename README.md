@@ -194,12 +194,13 @@ php backend/cli/user_upload.php --file users.csv --create-table
 
 ### CLI Options
 
-| Option              | Description                                    |
-|---------------------|------------------------------------------------|
-| `--file <filename>` | CSV file to process (**required** for import)  |
-| `--dry-run`         | Parse and validate without writing to the DB   |
-| `--create-table`    | Create or rebuild the `users` table            |
-| `--help`            | Display help text                              |
+| Option              | Description                                                    |
+|---------------------|----------------------------------------------------------------|
+| `--file <filename>` | CSV file to process (**required** for import)                  |
+| `--dry-run`         | Parse and validate without writing to the DB                   |
+| `--strict`          | Reject unexpected columns or row shape mismatches in the CSV   |
+| `--create-table`    | Create or rebuild the `users` table                            |
+| `--help`            | Display help text                                              |
 
 ---
 
@@ -212,14 +213,14 @@ composer test        # or: php vendor/bin/phpunit --testdox
 
 Expected output:
 ```
-OK (28 tests, 64 assertions)
+OK (31 tests, 72 assertions)
 ```
 
 ### Test coverage
 
 | Suite | Tests | What's covered |
 |---|---|---|
-| `CsvParserTest` | 10 | Valid CSV, Windows line endings, BOM stripping, whitespace trimming, empty rows, case-insensitive header, missing columns, file not found |
+| `CsvParserTest` | 13 | Valid CSV, Windows line endings, BOM stripping, whitespace trimming, empty rows, case-insensitive header, missing columns, file not found, strict mode (extra header, row mismatch, tolerant default) |
 | `UserValidatorTest` | 12 | Name/surname capitalisation, email lowercasing, hyphenated names, valid/invalid status, missing fields, batch deduplication, case-insensitive dedup, malformed emails |
 | `UserImporterTest` | 6 | Successful insert, invalid rows skipped (no DB call), unique-violation reported as skip, mixed rows, empty input, non-unique DB errors re-thrown |
 
@@ -278,25 +279,47 @@ The application will:
 
 ---
 
-## Design Decisions
+## Engineering Decisions
 
-### Shared Core Logic
-`CsvParser`, `UserValidator`, and `UserImporter` are plain PHP classes with no framework dependency. They are used identically by both the CLI and the HTTP API, ensuring consistent behaviour.
+### Why shared services?
+`CsvParser`, `UserValidator`, and `UserImporter` are plain PHP classes with no framework dependency. They are used identically by both the CLI and the HTTP API, ensuring consistent behaviour regardless of entry point. Changing validation logic in one place automatically applies to both interfaces.
 
-### Stateless API
-`POST /api/upload` returns the full parsed-and-validated preview to the client. The React UI holds this in state and sends the users back on `POST /api/import`. This avoids server-side session management and makes the API straightforward to test.
+### Why server-side revalidation on import?
+`POST /api/upload` validates for user feedback in the preview. `POST /api/import` re-validates the submitted data because the client is a trust boundary — the server must not rely on prior client-side validation before writing to the database.
 
-### Defence-in-Depth on Import
-Even though the client sends users that were already validated by `/api/upload`, the `/api/import` endpoint re-validates them server-side before inserting. The client is never trusted.
+### Why database-level uniqueness?
+Application-level duplicate detection provides useful errors and line-number attribution. The PostgreSQL `UNIQUE` constraint is the final integrity guarantee — if a duplicate slips through (e.g. a race condition or direct API call), the database rejects it gracefully. The importer catches SQLSTATE `23505` and reports it as a skip rather than a fatal error.
 
-### No PHP Framework
-Pure PHP was chosen to demonstrate fundamentals and keep dependencies minimal, as appropriate for a small, focused application.
+### Why does `--dry-run` avoid the database entirely?
+The CLI exits before obtaining a database connection or calling the importer when `--dry-run` is set. No connection is opened, guaranteeing that no database mutation can occur.
 
-### PostgreSQL UNIQUE Constraint
-The `email` column has a `UNIQUE` constraint at the database level. Even if a duplicate slips past application-level deduplication (e.g. a race condition), the database will reject it gracefully — the importer catches the `23505` SQLSTATE and reports it as a skip rather than a fatal error.
+### Why tolerant CSV parsing by default?
+Additional columns are ignored by default to support CSVs that contain metadata columns beyond the required schema (a common real-world situation). When schema enforcement is required, `--strict` mode can be used — it rejects unexpected header columns and rows with column-count mismatches.
 
-### Git History
-The repository was built incrementally with one commit per logical change, so the git history demonstrates the development process.
+### Why `--create-table` is destructive?
+`--create-table` is a development CLI flag, not a migration tool. The destructive rebuild is intentional for development convenience and is documented explicitly. In production, database migrations would be used instead (see Production Considerations below).
+
+### Why no PHP framework?
+Pure PHP demonstrates fundamentals and keeps dependencies minimal. For a focused application of this size, a framework would add complexity without benefit. The architecture is already layered (Parser → Validator → Importer) and could be adapted to any framework if needed.
+
+---
+
+## Production Considerations
+
+This application fulfils the coding challenge requirements. For a production deployment, the following additional concerns would need to be addressed:
+
+| Consideration | Current approach | Production approach |
+|---|---|---|
+| **Database migrations** | `--create-table` drops and recreates | Version-controlled migration tool (e.g. Phinx, Flyway) |
+| **Large file imports** | Entire file read into memory | Streaming CSV processing, background queue (e.g. RabbitMQ) |
+| **Authentication** | None (local dev tool) | Auth middleware around the import API |
+| **CORS** | Wildcard `*` (local dev) | Restrict to known frontend origin |
+| **File upload limits** | PHP default | Explicit size limits + file type validation |
+| **Logging** | None | Structured application logging (e.g. Monolog) |
+| **Transactions** | Per-row inserts | Wrap batch in a transaction for atomicity |
+| **Rate limiting** | None | API rate limiting to prevent abuse |
+| **Error monitoring** | None | Exception tracking (e.g. Sentry) |
+| **Environment config** | `.env` file | Secrets manager (e.g. AWS Secrets Manager, Vault) |
 
 ---
 
