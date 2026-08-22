@@ -65,7 +65,7 @@ The same core PHP services (`CsvParser`, `UserValidator`, `UserImporter`) are sh
 │       ├── types.ts
 │       └── index.css
 ├── docker-compose.yml
-├── users.csv                    # Sample data (50 rows)
+├── users.csv                    # Sample data (49 user records)
 └── README.md
 ```
 
@@ -74,7 +74,7 @@ The same core PHP services (`CsvParser`, `UserValidator`, `UserImporter`) are sh
 ## Requirements
 
 ### Without Docker
-- PHP 8.2+ (8.3 recommended) with `pdo` and `pdo_pgsql` extensions
+- PHP 8.3+ with `pdo` and `pdo_pgsql` extensions
 - Composer 2
 - PostgreSQL 16+
 - Node.js 20+ and npm
